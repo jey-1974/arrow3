@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>화살표 탈출</title>
+<style>
+:root{--bg:#f5f4ef;--fg:#1d1d1b;--card:#fff;--line:#dcdacf;--ac:#d9480f;--mu:#77756c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17171a;--fg:#ececea;--card:#232327;--line:#3a3a40;--ac:#ff8a4c;--mu:#9a9aa2;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#17171a;--fg:#ececea;--card:#232327;--line:#3a3a40;--ac:#ff8a4c;--mu:#9a9aa2;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px;min-height:100vh}
+h1{font-size:18px;margin:4px 0 0}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;width:min(94vw,640px)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px}
+button{font:inherit;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer}
+button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+button:disabled{opacity:.4}
+#time{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.stats{display:flex;gap:14px;font-size:14px;color:var(--mu);align-items:center}
+.stats b{color:var(--fg)}
+.lv{display:flex;gap:8px;align-items:center;width:min(94vw,640px)}
+.lv input[type=range]{flex:1;accent-color:var(--ac)}
+.stage{position:relative}
+#board{position:relative;overflow:hidden;border:2px solid var(--line);border-radius:12px;background-color:var(--card);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px)}
+.a{position:absolute;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.s{display:flex;align-items:center;justify-content:center;width:100%;height:100%;line-height:1}
+.s svg{width:72%;height:72%}
+.s img{width:74%;height:74%;object-fit:contain;pointer-events:none}
+.shake{animation:sh .35s}
+.sg{animation:sgk .35s}
+@keyframes sgk{0%,100%{transform:translate(0,0)}25%{transform:translate(-.12px,0)}50%{transform:translate(.12px,0)}75%{transform:translate(-.07px,0)}}
+@keyframes sh{0%,100%{transform:none}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+#three{touch-action:none;border:2px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);display:none}
+#three canvas{display:block;touch-action:none}
+#ov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);border-radius:12px}
+#ov .card{text-align:center;padding:20px 26px}
+#ov h2{margin:0 0 6px}
+details{width:min(94vw,640px)}
+summary{cursor:pointer;color:var(--mu);font-size:14px}
+.set{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:8px;font-size:14px}
+.set input[type=text]{width:90px;font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.hint{font-size:12px;color:var(--mu);width:min(94vw,640px);text-align:center;margin:0}
+</style></head><body>
+<h1>화살표 탈출</h1>
+<div class="bar">
+  <button id="m2" class="on">2D</button><button id="m3">3D</button>
+  <div class="card"><div id="time">00:00.0</div></div>
+  <div class="stats"><span>남은 <b id="left">0</b></span><span>실수 <b id="miss">0</b></span><span>최고 <b id="best">-</b></span></div>
+</div>
+<div class="lv">
+  <button id="lm">−</button><input type="range" id="lvr" min="1" max="40" value="1"><button id="lp">+</button>
+  <span style="min-width:64px;text-align:right">단계 <b id="lvn">1</b>/40</span>
+  <button id="nw">새로 시작</button>
+</div>
+<div class="stage">
+  <div id="board"></div><div id="three"></div>
+  <div id="ov"><div class="card"><h2>클리어!</h2><div id="res"></div><div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><button id="again">다시</button><button id="next" class="on">다음 단계</button></div></div></div>
+</div>
+<p class="hint" id="hint">화살표를 누르면 그 방향으로 빠져나갑니다. 앞이 막혀 있으면 흔들려요. 시간은 첫 클릭부터 측정됩니다.</p>
+<details><summary>🎨 화살표 모양 바꾸기 (2D)</summary>
+<div class="set">
+  <label><input type="radio" name="sh" value="default" checked> 기본</label>
+  <label><input type="radio" name="sh" value="text"> 글자/이모지 <input type="text" id="tx" value="➤" maxlength="4"></label>
+  <label><input type="radio" name="sh" value="image"> 이미지 <input type="file" id="fi" accept="image/*"></label>
+  <label>색 <input type="color" id="co" value="#d9480f"></label>
+</div>
+<p class="hint" style="text-align:left;width:auto;margin-top:6px">글자·이미지는 “오른쪽을 향한 모양”으로 만들어 주세요. 방향에 맞게 자동으로 회전하고, 뱀 화살표의 머리(화살촉) 자리에 들어가요.</p></details>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const D2=[[1,0,0],[0,1,0],[-1,0,0],[0,-1,0]];
+const D3=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+const COL3=[0xe8590c,0xf08c00,0x2f9e44,0x1c7ed6,0x7048e8,0xd6336c];
+let mode='2d',level=1,n=3,arrows=[],t0=0,elapsed=0,running=false,done=false,miss=0,timer=null;
+const shape={type:'default',text:'➤',img:'',color:'#d9480f'};
+const rnd=a=>Math.floor(Math.random()*a);
+const shuf=a=>{for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]]}return a};
+const fmt=ms=>{const s=ms/1000;return String(Math.floor(s/60)).padStart(2,'0')+':'+(s%60).toFixed(1).padStart(4,'0')};
+const bkey=()=>'arrowbest:'+mode+':'+level;
+function getBest(){try{return +localStorage.getItem(bkey())||0}catch(e){return 0}}
+function setBest(v){try{localStorage.setItem(bkey(),v)}catch(e){}}
+
+function inRay(a,p,dirs){const d=dirs[a.d];let t=0,ok=true;
+  for(let i=0;i<3;i++){const v=p[i]-a.p[i];if(d[i]!==0)t=v*d[i];else if(v!==0)ok=false}
+  return ok&&t>0}
+function blocked(a){const dirs=mode==='2d'?D2:D3;return arrows.some(b=>b!==a&&b.alive&&b.cells.some(q=>inRay(a,q,dirs)))}
+
+// 풀 수 있는 퍼즐 생성: 나중에 놓인 화살표가 먼저 놓인 화살표의 진행 경로에 들어가지 않도록 배치
+function gen(){
+  const is3=mode==='3d',dirs=is3?D3:D2;let target;
+  if(is3){n=2+Math.floor((level-1)/10);target=Math.max(3,Math.round(n**3*(.4+((level-1)%10)*.04)))}
+  else{n=3+Math.floor((level-1)*11/39);target=Math.round(n*n*(.45+level*.011))}
+  const cells=[];for(let x=0;x<n;x++)for(let y=0;y<n;y++)for(let z=0;z<(is3?n:1);z++)cells.push([x,y,z]);
+  shuf(cells);arrows=[];
+  for(const p of cells){
+    if(arrows.length>=target)break;
+    if(arrows.some(a=>inRay(a,p,dirs)))continue;
+    let d=rnd(dirs.length);
+    if(Math.random()<.55){let best=1e9;dirs.forEach((v,i)=>{let len=0;for(let k=0;k<3;k++)if(v[k]!==0)len=v[k]>0?n-1-p[k]:p[k];len+=Math.random()*.6;if(len<best){best=len;d=i}})}
+    arrows.push({p,d,alive:true,cells:[p]});
+  }
+}
+
+// ---------- 타이머 ----------
+function start(){if(running||done)return;running=true;t0=performance.now()-elapsed;timer=setInterval(()=>{elapsed=performance.now()-t0;$('#time').textContent=fmt(elapsed)},50)}
+function upd(){$('#left').textContent=arrows.filter(a=>a.alive).length;$('#miss').textContent=miss;const b=getBest();$('#best').textContent=b?fmt(b):'-'}
+function check(){upd();if(arrows.some(a=>a.alive))return;
+  clearInterval(timer);running=false;done=true;elapsed=performance.now()-t0;$('#time').textContent=fmt(elapsed);
+  const b=getBest();let msg='기록 '+fmt(elapsed)+' · 실수 '+miss+'번';
+  if(!b||elapsed<b){setBest(Math.round(elapsed));msg+='<br>🏆 최고 기록!'}
+  $('#res').innerHTML=msg;$('#next').textContent=level<40?'다음 단계':'1단계로';
+  setTimeout(()=>{$('#ov').style.display='flex';upd()},mode==='2d'?1100:900)}
+
+// ---------- 2D ----------
+function shapeHTML(){
+  if(shape.type==='text'){const d=document.createElement('div');d.textContent=shape.text||'➤';return d.innerHTML}
+  if(shape.type==='image'&&shape.img)return '<img src="'+shape.img+'" alt="">';
+  return '<svg viewBox="0 0 24 24"><path d="M3 12h15M12 5l7 7-7 7" stroke="currentColor" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'}
+function render2(){
+  const b=$('#board'),W=Math.floor(Math.min(innerWidth*.94,innerHeight*.56,640)),c=W/n;
+  b.style.width=b.style.height=W+'px';b.style.backgroundSize=c+'px '+c+'px';b.innerHTML='';
+  arrows.forEach(a=>{if(!a.alive)return;
+    const e=document.createElement('div');e.className='a';
+    e.style.cssText='left:'+a.p[0]*c+'px;top:'+a.p[1]*c+'px;width:'+c+'px;height:'+c+'px;color:'+shape.color+';font-size:'+c*.62+'px';
+    const s=document.createElement('div');s.className='s';s.style.transform='rotate('+a.d*90+'deg)';s.innerHTML=shapeHTML();
+    e.appendChild(s);e.onclick=()=>click2(a,e,s,c);b.appendChild(e)})}
+function click2(a,e,s,c){
+  if(done||!a.alive)return;start();
+  if(blocked(a)){miss++;upd();e.classList.remove('shake');void e.offsetWidth;e.classList.add('shake');return}
+  a.alive=false;e.style.zIndex=5;e.style.pointerEvents='none';
+  s.style.transition='transform .7s cubic-bezier(.5,0,1,.6),opacity .7s';
+  s.style.transform='rotate('+a.d*90+'deg) translateX('+n*c*1.3+'px)';s.style.opacity=0;
+  setTimeout(()=>e.remove(),750);check()}
+
+// ---------- 3D ----------
+let R,S,C,W3,rc,last=0,drag=null,shaftG,coneG;const SP=1.15;
+function init3(){
+  if(R)return;
+  S=new THREE.Scene();C=new THREE.PerspectiveCamera(45,1,.1,100);
+  R=new THREE.WebGLRenderer({antialias:true,alpha:true});R.setPixelRatio(Math.min(devicePixelRatio,2));
+  $('#three').appendChild(R.domElement);
+  S.add(new THREE.AmbientLight(0xffffff,.7));const l=new THREE.DirectionalLight(0xffffff,.8);l.position.set(3,5,4);S.add(l);
+  W3=new THREE.Group();S.add(W3);rc=new THREE.Raycaster();
+  shaftG=new THREE.CylinderGeometry(.1,.1,.5,12);shaftG.translate(0,-.12,0);
+  coneG=new THREE.ConeGeometry(.24,.42,16);coneG.translate(0,.3,0);
+  const el=R.domElement;
+  el.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,m:0};el.setPointerCapture(e.pointerId)});
+  el.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.m+=Math.abs(dx)+Math.abs(dy);drag.x=e.clientX;drag.y=e.clientY;
+    W3.rotation.y+=dx*.01;W3.rotation.x=Math.max(-1.4,Math.min(1.4,W3.rotation.x+dy*.01))});
+  el.addEventListener('pointerup',e=>{if(drag&&drag.m<6)pick(e);drag=null});
+  requestAnimationFrame(loop)}
+function size3(){const W=Math.floor(Math.min(innerWidth*.94,innerHeight*.56,640));R.setSize(W,W);C.aspect=1;C.updateProjectionMatrix();C.position.set(0,0,n*SP*1.9+2.2);C.lookAt(0,0,0)}
+function build3(){
+  while(W3.children.length)W3.remove(W3.children[0]);
+  W3.rotation.set(.5,-.6,0);size3();
+  const L=n*SP;const box=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(L,L,L)),new THREE.LineBasicMaterial({color:0x888888,transparent:true,opacity:.5}));W3.add(box);
+  arrows.forEach(a=>{
+    const m=new THREE.MeshLambertMaterial({color:COL3[a.d]});const g=new THREE.Group();
+    g.add(new THREE.Mesh(shaftG,m),new THREE.Mesh(coneG,m));
+    const d=new THREE.Vector3(...D3[a.d]);g.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),d);
+    a.dir=d;a.base=new THREE.Vector3(...a.p.map(v=>(v-(n-1)/2)*SP));a.g=g;a.m=m;a.off=0;a.v=0;a.k=0;a.state='';g.userData.a=a;
+    g.position.copy(a.base);W3.add(g)})}
+function pick(e){
+  const r=R.domElement.getBoundingClientRect();
+  rc.setFromCamera(new THREE.Vector2((e.clientX-r.left)/r.width*2-1,-((e.clientY-r.top)/r.height)*2+1),C);
+  for(const h of rc.intersectObjects(W3.children,true)){let o=h.object;while(o&&!o.userData.a)o=o.parent;if(o){click3(o.userData.a);return}}}
+function click3(a){
+  if(done||!a.alive||a.state)return;start();
+  if(blocked(a)){miss++;upd();a.state='shake';a.k=.4;a.m.color.setHex(0xe03131);return}
+  a.alive=false;a.state='out';a.v=2;check()}
+function loop(ts){
+  requestAnimationFrame(loop);if(mode!=='3d')return;
+  const dt=Math.min((ts-last)/1000||0,.05);last=ts;
+  arrows.forEach(a=>{if(!a.g||a.state==='gone')return;let s=0;
+    if(a.state==='out'){a.v+=dt*30;a.off+=a.v*dt;if(a.off>n*SP+6){W3.remove(a.g);a.state='gone';return}}
+    else if(a.state==='shake'){a.k-=dt;s=Math.sin(a.k*55)*.09;if(a.k<=0){a.state='';a.m.color.setHex(COL3[a.d])}}
+    a.g.position.copy(a.base).addScaledVector(a.dir,a.off+s)});
+  R.render(S,C)}
+
+// ---------- 2D 뱀 화살표 (이 정의가 위의 render2/click2를 대체) ----------
+const DV=[[1,0],[0,1],[-1,0],[0,-1]],NS='http://www.w3.org/2000/svg';
+const el=(t,at)=>{const e=document.createElementNS(NS,t);for(const k in at)e.setAttribute(k,at[k]);return e};
+function gen2(){
+  n=3+Math.floor((level-1)*11/39);
+  n=3+Math.floor((level-1)*22/39);const maxL=Math.min(25,2+Math.floor((level-1)*23/39)),fill=.42+level*.008;
+  const occ=new Set(),ray=new Set(),K=(x,y)=>x+','+y;arrows=[];let tries=0;
+  const free=(x,y)=>x>=0&&y>=0&&x<n&&y<n&&!occ.has(K(x,y))&&!ray.has(K(x,y));
+  const rayOf=(h,d)=>{const r=[];let x=h[0]+DV[d][0],y=h[1]+DV[d][1];while(x>=0&&y>=0&&x<n&&y<n){r.push([x,y]);x+=DV[d][0];y+=DV[d][1]}return r};
+  while(occ.size<n*n*fill&&tries++<2500){
+    const x=rnd(n),y=rnd(n);if(!free(x,y))continue;
+    const L=1+rnd(maxL),cells=[[x,y,0]],mark=new Set([K(x,y)]);let pd=rnd(4);
+    while(cells.length<L){
+      const c=cells[cells.length-1],order=shuf([0,1,2,3]);
+      if(Math.random()<.5){order.splice(order.indexOf(pd),1);order.unshift(pd)}
+      let moved=false;
+      for(const k of order){const nx=c[0]+DV[k][0],ny=c[1]+DV[k][1];if(free(nx,ny)&&!mark.has(K(nx,ny))){cells.push([nx,ny,0]);mark.add(K(nx,ny));pd=k;moved=true;break}}
+      if(!moved)break}
+    const cand=[];
+    if(cells.length===1)for(let d=0;d<4;d++)cand.push({cs:cells,d});
+    else for(const cs of [cells,cells.slice().reverse()]){const h=cs[cs.length-1],p=cs[cs.length-2];cand.push({cs,d:DV.findIndex(v=>v[0]===h[0]-p[0]&&v[1]===h[1]-p[1])})}
+    let best=null,bs=1e9;
+    for(const c of cand){const h=c.cs[c.cs.length-1],r=rayOf(h,c.d);
+      if(r.some(q=>mark.has(K(q[0],q[1]))))continue;
+      const sc=r.length+Math.random()*3;if(sc<bs){bs=sc;best={...c,r}}}
+    if(!best)continue;
+    best.cs.forEach(c=>occ.add(K(c[0],c[1])));best.r.forEach(q=>ray.add(K(q[0],q[1])));
+    arrows.push({cells:best.cs,p:best.cs[best.cs.length-1],d:best.d,alive:true})}
+}
+function pathOf(a){
+  const cs=a.cells,pts=cs.map(c=>[c[0]+.5,c[1]+.5]),v=DV[a.d];
+  const f=cs.length>1?[pts[1][0]-pts[0][0],pts[1][1]-pts[0][1]]:v;
+  pts.unshift([pts[0][0]-f[0]*.3,pts[0][1]-f[1]*.3]);
+  a.body=cs.length-1+.3;
+  const h=pts[pts.length-1],ext=n+a.body+3;pts.push([h[0]+v[0]*ext,h[1]+v[1]*ext]);a.pts=pts;
+  a.exit=(v[0]>0?n-a.p[0]-.5:v[0]<0?a.p[0]+.5:v[1]>0?n-a.p[1]-.5:a.p[1]+.5)+a.body+.6}
+function slice(a,s0,s1){
+  const P=a.pts,out=[];let acc=0,dir=DV[a.d];
+  for(let i=0;i<P.length-1;i++){const[x0,y0]=P[i],[x1,y1]=P[i+1],l=Math.hypot(x1-x0,y1-y0),e=acc+l;
+    if(e>s0&&acc<s1){const t0=Math.max(0,(s0-acc)/l),t1=Math.min(1,(s1-acc)/l);
+      if(!out.length)out.push([x0+(x1-x0)*t0,y0+(y1-y0)*t0]);out.push([x0+(x1-x0)*t1,y0+(y1-y0)*t1]);dir=[(x1-x0)/l,(y1-y0)/l]}
+    acc=e}
+  return{pts:out,dir}}
+function draw(a){
+  const r=slice(a,a.s,a.s+a.body),str=r.pts.map(p=>p[0].toFixed(3)+','+p[1].toFixed(3)).join(' ');
+  a.poly.setAttribute('points',str);a.hit.setAttribute('points',str);
+  const h=r.pts[r.pts.length-1];
+  a.hd.setAttribute('transform','translate('+h[0]+' '+h[1]+') rotate('+Math.atan2(r.dir[1],r.dir[0])*180/Math.PI+')')}
+function mkHead(){
+  const g=el('g',{});
+  if(shape.type==='text'){const t=el('text',{'font-size':.8,'text-anchor':'middle','dominant-baseline':'central',fill:shape.color});t.textContent=shape.text||'➤';g.append(t)}
+  else if(shape.type==='image'&&shape.img)g.append(el('image',{href:shape.img,x:-.42,y:-.42,width:.84,height:.84}));
+  else g.append(el('polygon',{points:'-.3,-.34 .38,0 -.3,.34',fill:shape.color}));
+  return g}
+function render2(){
+  const b=$('#board'),W=Math.floor(Math.min(innerWidth*.94,innerHeight*.56,640)),c=W/n;
+  b.style.width=b.style.height=W+'px';b.style.backgroundSize=c+'px '+c+'px';b.innerHTML='';
+  const svg=el('svg',{viewBox:'0 0 '+n+' '+n,width:W,height:W});svg.style.display='block';b.appendChild(svg);
+  const ln={fill:'none','stroke-linecap':'round','stroke-linejoin':'round'};
+  arrows.forEach(a=>{if(!a.alive)return;if(!a.pts)pathOf(a);a.s=0;a.out=false;
+    const g=el('g',{}),hit=el('polyline',{...ln,stroke:'transparent','stroke-width':.55,'pointer-events':'stroke'}),
+      poly=el('polyline',{...ln,stroke:shape.color,'stroke-width':.2,'pointer-events':'none'}),hd=mkHead();
+    hd.setAttribute('pointer-events','none');g.append(hit,poly,hd);g.style.cursor='pointer';svg.appendChild(g);
+    a.g=g;a.poly=poly;a.hit=hit;a.hd=hd;draw(a);g.onclick=()=>click2(a)})}
+function click2(a){
+  if(done||!a.alive||a.out)return;start();
+  if(blocked(a)){miss++;upd();const g=a.g;g.classList.remove('sg');void g.getBoundingClientRect();g.classList.add('sg');return}
+  a.alive=false;a.out=true;a.v=3;a.g.style.pointerEvents='none';
+  let last=performance.now();
+  const f=now=>{const dt=Math.min((now-last)/1000,.05);last=now;a.v+=dt*26;a.s+=a.v*dt;
+    if(a.s>=a.exit){a.g.remove();return}draw(a);requestAnimationFrame(f)};
+  requestAnimationFrame(f);check()}
+
+// ---------- 3D 뱀 화살표 (위의 gen/build3/loop를 대체) ----------
+let sphG;
+function gen3(){
+  n=3+Math.floor((level-1)*3/39);
+  const maxL=Math.min(12,2+Math.floor((level-1)*10/39)),fill=.3+level*.01;
+  const occ=new Set(),ray=new Set(),K=p=>p.join(',');arrows=[];let tries=0;
+  const inB=p=>p.every(v=>v>=0&&v<n),free=p=>inB(p)&&!occ.has(K(p))&&!ray.has(K(p));
+  const add=(p,k)=>p.map((v,i)=>v+D3[k][i]);
+  const rayOf=(h,d)=>{const r=[];let p=add(h,d);while(inB(p)){r.push(p);p=add(p,d)}return r};
+  while(occ.size<n**3*fill&&tries++<2500){
+    const s=[rnd(n),rnd(n),rnd(n)];if(!free(s))continue;
+    const L=1+rnd(maxL),cells=[s],mark=new Set([K(s)]);let pd=rnd(6);
+    while(cells.length<L){
+      const c=cells[cells.length-1],order=shuf([0,1,2,3,4,5]);
+      if(Math.random()<.45){order.splice(order.indexOf(pd),1);order.unshift(pd)}
+      let moved=false;
+      for(const k of order){const q=add(c,k);if(free(q)&&!mark.has(K(q))){cells.push(q);mark.add(K(q));pd=k;moved=true;break}}
+      if(!moved)break}
+    const cand=[];
+    if(cells.length===1)for(let d=0;d<6;d++)cand.push({cs:cells,d});
+    else for(const cs of [cells,cells.slice().reverse()]){const h=cs[cs.length-1],p=cs[cs.length-2];cand.push({cs,d:D3.findIndex(v=>v.every((x,i)=>x===h[i]-p[i]))})}
+    let best=null,bs=1e9;
+    for(const c of cand){const r=rayOf(c.cs[c.cs.length-1],c.d);if(r.some(q=>mark.has(K(q))))continue;const sc=r.length+Math.random()*2;if(sc<bs){bs=sc;best={...c,r}}}
+    if(!best)continue;
+    best.cs.forEach(c=>occ.add(K(c)));best.r.forEach(q=>ray.add(K(q)));
+    arrows.push({cells:best.cs,p:best.cs[best.cs.length-1],d:best.d,alive:true})}
+}
+function pointAt(a,dist){
+  const P=a.P,c=a.cum;dist=Math.max(0,Math.min(dist,c[c.length-1]));let i=1;while(i<c.length-1&&c[i]<dist)i++;
+  const t=(dist-c[i-1])/(c[i]-c[i-1]);return{p:P[i-1].clone().lerp(P[i],t),d:P[i].clone().sub(P[i-1]).normalize()}}
+function pose(a){
+  for(let i=0;i<a.sps.length;i++)a.sps[i].position.copy(pointAt(a,a.s+Math.max(0,a.body-i*.16)).p);
+  const h=pointAt(a,a.s+a.body);a.cone.position.copy(h.p);a.cone.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),h.d)}
+function build3(){
+  while(W3.children.length)W3.remove(W3.children[0]);
+  W3.rotation.set(.5,-.6,0);size3();sphG=sphG||new THREE.SphereGeometry(.1,10,8);
+  const L=n*SP;W3.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(L,L,L)),new THREE.LineBasicMaterial({color:0x888888,transparent:true,opacity:.5})));
+  arrows.forEach((a,i)=>{
+    a.col=COL3[i%6];const m=new THREE.MeshLambertMaterial({color:a.col}),g=new THREE.Group(),v=new THREE.Vector3(...D3[a.d]);
+    const cs=a.cells.map(c=>new THREE.Vector3(...c.map(x=>(x-(n-1)/2)*SP)));
+    const f=cs.length>1?cs[1].clone().sub(cs[0]).normalize():v.clone();
+    const P=[cs[0].clone().addScaledVector(f,-.35),...cs],hc=cs[cs.length-1];
+    P.push(hc.clone().addScaledVector(v,n*SP+3+cs.length*SP));
+    const cum=[0];for(let k=1;k<P.length;k++)cum.push(cum[k-1]+P[k].distanceTo(P[k-1]));
+    a.P=P;a.cum=cum;a.body=cum[P.length-2];a.exit=n*SP/2-hc.dot(v)+a.body+.6;
+    a.dirv=v;a.m=m;a.g=g;a.s=0;a.v=0;a.k=0;a.state='';a.sps=[];
+    for(let k=0;k<Math.ceil(a.body/.16)+1;k++){const s=new THREE.Mesh(sphG,m);a.sps.push(s);g.add(s)}
+    a.cone=new THREE.Mesh(coneG,m);g.add(a.cone);g.userData.a=a;pose(a);W3.add(g)})}
+function loop(ts){
+  requestAnimationFrame(loop);if(mode!=='3d')return;
+  const dt=Math.min((ts-last)/1000||0,.05);last=ts;
+  arrows.forEach(a=>{if(!a.g||a.state==='gone')return;
+    if(a.state==='out'){a.v+=dt*30;a.s+=a.v*dt;if(a.s>=a.exit){W3.remove(a.g);a.state='gone';return}pose(a)}
+    else if(a.state==='shake'){a.k-=dt;a.g.position.copy(a.dirv).multiplyScalar(Math.sin(a.k*55)*.09);
+      if(a.k<=0){a.state='';a.g.position.set(0,0,0);a.m.color.setHex(a.col)}}});
+  R.render(S,C)}
+
+// ---------- 공통 ----------
+function setMode(m){
+  if(m==='3d'&&typeof THREE==='undefined'){$('#hint').textContent='3D 라이브러리를 불러오지 못했어요. 네트워크를 확인해 주세요.';return}
+  mode=m;$('#m2').classList.toggle('on',m==='2d');$('#m3').classList.toggle('on',m==='3d');newGame()}
+function newGame(){
+  clearInterval(timer);elapsed=0;running=false;done=false;miss=0;$('#time').textContent='00:00.0';$('#ov').style.display='none';
+  $('#lvr').value=level;$('#lvn').textContent=level;mode==='2d'?gen2():gen3();
+  if(mode==='2d'){$('#board').style.display='block';$('#three').style.display='none';render2();
+    $('#hint').textContent='머리(화살촉)가 향한 쪽이 비어 있어야 빠져나가요. 길고 꼬불꼬불한 뱀 화살표도 있어요. 앞이 막혀 있으면 흔들려요. 시간은 첫 클릭부터 측정됩니다.'}
+  else{init3();$('#board').style.display='none';$('#three').style.display='block';build3();
+    $('#hint').textContent='3D: 드래그로 큐브를 돌리고, 화살표를 눌러 빼내세요. 뱀 화살표는 머리가 향한 쪽이 비어 있어야 나가요. (모양 설정은 2D 전용)'}
+  upd()}
+function setLevel(v){level=Math.max(1,Math.min(40,v));newGame()}
+$('#m2').onclick=()=>setMode('2d');$('#m3').onclick=()=>setMode('3d');
+$('#lm').onclick=()=>setLevel(level-1);$('#lp').onclick=()=>setLevel(level+1);
+$('#lvr').oninput=e=>setLevel(+e.target.value);$('#nw').onclick=newGame;$('#again').onclick=newGame;
+$('#next').onclick=()=>setLevel(level<40?level+1:1);
+document.querySelectorAll('input[name=sh]').forEach(r=>r.onchange=()=>{shape.type=r.value;if(mode==='2d')render2()});
+$('#tx').oninput=e=>{shape.text=e.target.value;document.querySelector('input[name=sh][value=text]').checked=true;shape.type='text';if(mode==='2d')render2()};
+$('#co').oninput=e=>{shape.color=e.target.value;if(mode==='2d')render2()};
+$('#fi').onchange=e=>{const f=e.target.files[0];if(!f)return;const fr=new FileReader();
+  fr.onload=()=>{shape.img=fr.result;shape.type='image';document.querySelector('input[name=sh][value=image]').checked=true;if(mode==='2d')render2()};fr.readAsDataURL(f)};
+addEventListener('resize',()=>{if(mode==='2d')render2();else if(R)size3()});
+newGame();
+</script></body></html>
